@@ -1,0 +1,432 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// For local SQLite development, replace the above with:
+// datasource db {
+//   provider = "sqlite"
+//   url      = env("DATABASE_URL")
+// }
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  phone         String?
+  password      String
+  name          String
+  role          String    @default("BUYER")
+  isVerified    Boolean   @default(false)
+  avatarUrl     String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  company           Company?
+  inquiries         Inquiry[]     @relation("BuyerInquiries")
+  receivedInquiries Inquiry[]     @relation("SellerInquiries")
+  sentMessages      Message[]     @relation("SentMessages")
+  sentReviews       Review[]      @relation("ReviewerReviews")
+  orders            Order[]       @relation("BuyerOrders")
+  customers         Customer[]
+  stockTransactions StockTransaction[]
+
+  @@index([email])
+  @@index([role])
+}
+
+model Company {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  logoUrl     String?
+  website     String?
+  phone       String?
+  address     String?
+  city        String?
+  state       String?
+  pincode     String?
+  gstin       String?
+  isVerified  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  ownerId   String       @unique
+  owner     User         @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  products  Product[]
+  customers Customer[]
+  orders    Order[]      @relation("SupplierOrders")
+  invoices  Invoice[]
+  warehouses Warehouse[]
+
+  @@index([name])
+  @@index([city, state])
+}
+
+model Customer {
+  id        String   @id @default(cuid())
+  name      String
+  email     String?
+  phone     String?
+  companyName String?
+  address   String?
+  city      String?
+  state     String?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdBy String?
+  createdByUser User? @relation(fields: [createdBy], references: [id])
+
+  @@index([companyId])
+  @@index([email])
+}
+
+model Category {
+  id          String     @id @default(cuid())
+  name        String
+  slug        String     @unique
+  description String?
+  imageUrl    String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  parentId String?
+  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryTree")
+  products Product[]
+
+  @@index([slug])
+  @@index([parentId])
+}
+
+model Brand {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  logoUrl   String?
+  createdAt DateTime @default(now())
+  products  Product[]
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  title       String
+  slug        String   @unique
+  description String?
+  shortDesc   String?
+  minOrderQty Int      @default(1)
+  price       Float    @default(0)
+  moqPrice    Float?
+  unit        String   @default("Piece")
+  images      String   @default("[]")
+  status      String   @default("ACTIVE")
+  tags        String   @default("[]")
+  gstRate     Float?
+  hsnCode     String?
+  specs       String   @default("{}")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  companyId  String
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id])
+  brandId    String?
+  brand      Brand?   @relation(fields: [brandId], references: [id])
+
+  inquiries      Inquiry[]
+  reviews        Review[]
+  inventory      Inventory[]
+  stockTxns      StockTransaction[]
+  orderItems     OrderItem[]
+  quoteItems     QuoteItem[]
+  bomParent      BOM[]           @relation("BOMProduct")
+  bomComponents  BOMItem[]
+
+  @@index([slug])
+  @@index([companyId])
+  @@index([categoryId])
+  @@index([status])
+  @@index([title])
+  @@index([hsnCode])
+}
+
+model Warehouse {
+  id        String   @id @default(cuid())
+  name      String
+  address   String?
+  city      String?
+  state     String?
+  pincode   String?
+  contact   String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  companyId String
+  company   Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  locations WarehouseLocation[]
+  inventory Inventory[]
+  stockTxns StockTransaction[]
+
+  @@index([companyId])
+}
+
+model WarehouseLocation {
+  id         String   @id @default(cuid())
+  rack       String?
+  shelf      String?
+  bin        String?
+  barcode    String?
+  createdAt  DateTime @default(now())
+
+  warehouseId String
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  inventory   Inventory[]
+  stockTxns   StockTransaction[]
+
+  @@index([warehouseId])
+  @@index([barcode])
+}
+
+model Inventory {
+  id              String   @id @default(cuid())
+  availableQty    Float    @default(0)
+  reservedQty     Float    @default(0)
+  minStock        Float?
+  maxStock        Float?
+  leadTimeDays    Int?
+  stockVisibility String   @default("EXACT")
+  approximateQty  String?
+  lastUpdatedAt   DateTime @updatedAt
+
+  productId  String
+  product    Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  warehouseId String
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  locationId String?
+  location   WarehouseLocation? @relation(fields: [locationId], references: [id])
+
+  @@unique([productId, warehouseId])
+  @@index([productId])
+  @@index([warehouseId])
+  @@index([stockVisibility])
+}
+
+model StockTransaction {
+  id        String   @id @default(cuid())
+  type      String
+  qty       Float
+  direction String   @default("IN")
+  refType   String?
+  refId     String?
+  notes     String?
+  createdAt DateTime @default(now())
+
+  productId   String
+  product     Product @relation(fields: [productId], references: [id])
+  warehouseId String
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  locationId  String?
+  location    WarehouseLocation? @relation(fields: [locationId], references: [id])
+  createdById String?
+  createdBy   User?   @relation(fields: [createdById], references: [id])
+
+  @@index([productId])
+  @@index([warehouseId])
+  @@index([type])
+  @@index([createdAt])
+}
+
+model BOM {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  outputQty   Float    @default(1)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  productId String
+  product   Product   @relation("BOMProduct", fields: [productId], references: [id], onDelete: Cascade)
+  items     BOMItem[]
+
+  @@index([productId])
+}
+
+model BOMItem {
+  id       String @id @default(cuid())
+  quantity Float  @default(1)
+
+  bomId           String
+  bom             BOM     @relation(fields: [bomId], references: [id], onDelete: Cascade)
+  componentId     String
+  componentProduct Product @relation(fields: [componentId], references: [id])
+
+  @@unique([bomId, componentId])
+}
+
+model Inquiry {
+  id        String   @id @default(cuid())
+  quantity  Int
+  message   String?
+  status    String   @default("OPEN")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  buyerId   String
+  buyer     User     @relation("BuyerInquiries", fields: [buyerId], references: [id])
+  sellerId  String
+  seller    User     @relation("SellerInquiries", fields: [sellerId], references: [id])
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+  messages  Message[]
+  quotes    Quote[]
+
+  @@index([buyerId])
+  @@index([sellerId])
+  @@index([productId])
+  @@index([status])
+}
+
+model Quote {
+  id         String   @id @default(cuid())
+  price      Float
+  moq        Int?
+  validUntil DateTime?
+  notes      String?
+  status     String   @default("PENDING")
+  createdAt  DateTime @default(now())
+
+  inquiryId String
+  inquiry   Inquiry    @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
+  items     QuoteItem[]
+
+  @@index([inquiryId])
+  @@index([status])
+}
+
+model QuoteItem {
+  id        String @id @default(cuid())
+  qty       Int
+  unitPrice Float
+
+  quoteId   String
+  quote     Quote   @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+}
+
+model Order {
+  id          String   @id @default(cuid())
+  orderNumber String   @unique
+  status      String   @default("PENDING")
+  subtotal    Float    @default(0)
+  taxAmount   Float    @default(0)
+  totalAmount Float    @default(0)
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  buyerId    String
+  buyer      User      @relation("BuyerOrders", fields: [buyerId], references: [id])
+  supplierId String?
+  supplier   Company?  @relation("SupplierOrders", fields: [supplierId], references: [id])
+  items      OrderItem[]
+  invoices   Invoice[]
+
+  @@index([orderNumber])
+  @@index([buyerId])
+  @@index([supplierId])
+  @@index([status])
+}
+
+model OrderItem {
+  id        String @id @default(cuid())
+  qty       Int
+  unitPrice Float
+  subtotal  Float
+
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  @@index([orderId])
+}
+
+model Invoice {
+  id            String   @id @default(cuid())
+  invoiceNumber String   @unique
+  amount        Float
+  taxAmount     Float    @default(0)
+  status        String   @default("DRAFT")
+  dueDate       DateTime?
+  paidAt        DateTime?
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id])
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+
+  @@index([invoiceNumber])
+  @@index([companyId])
+  @@index([orderId])
+  @@index([status])
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  content   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  senderId  String
+  sender    User    @relation("SentMessages", fields: [senderId], references: [id])
+  inquiryId String
+  inquiry   Inquiry @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
+
+  @@index([inquiryId])
+  @@index([senderId])
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
+
+  reviewerId String
+  reviewer   User    @relation("ReviewerReviews", fields: [reviewerId], references: [id])
+  productId  String
+  product    Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([reviewerId, productId])
+  @@index([productId])
+}
+
+model AIPrediction {
+  id        String   @id @default(cuid())
+  type      String
+  input     String   @default("{}")
+  output    String   @default("{}")
+  confidence Float?
+  createdAt DateTime @default(now())
+
+  productId   String?
+  companyId   String?
+  warehouseId String?
+
+  @@index([type])
+  @@index([productId])
+  @@index([createdAt])
+}

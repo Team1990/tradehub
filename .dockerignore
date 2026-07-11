@@ -1,0 +1,14 @@
+node_modules
+dist
+.git
+*.md
+.env
+.env.local
+.gitignore
+frontend/node_modules
+frontend/dist
+backend/node_modules
+backend/dist
+backend/*.db
+backend/*.db-journal
+uploads
