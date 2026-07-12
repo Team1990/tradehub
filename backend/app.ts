@@ -42,13 +42,15 @@ app.post('/api/setup/seed', async (_req, res) => {
   try {
     const { execSync } = require('child_process');
     const backendDir = path.resolve(__dirname, '..');
-    const push = execSync('npx prisma db push', { cwd: backendDir, encoding: 'utf8', timeout: 60000 });
-    const seed = execSync('npx prisma db seed', { cwd: backendDir, encoding: 'utf8', timeout: 120000 });
-    res.json({ success: true, push: push, seed: seed });
+    const dbUrl = process.env.DATABASE_URL?.substring(0, 50) + '...';
+    const push = execSync('npx prisma db push 2>&1', { cwd: backendDir, encoding: 'utf8', timeout: 60000, shell: true });
+    const seed = execSync('npx prisma db seed 2>&1', { cwd: backendDir, encoding: 'utf8', timeout: 120000, shell: true });
+    res.json({ success: true, dbUrl, push, seed });
   } catch (err: any) {
     res.status(500).json({
       success: false,
-      message: err.stderr?.toString() || err.message,
+      dbUrl: process.env.DATABASE_URL?.substring(0, 50) + '...',
+      message: err.message,
       stdout: err.stdout?.toString(),
       stderr: err.stderr?.toString(),
     });
