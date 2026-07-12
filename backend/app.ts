@@ -37,6 +37,17 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Temporary: seed endpoint for first-time setup
+app.post('/api/setup/seed', async (_req, res) => {
+  try {
+    const { execSync } = require('child_process');
+    execSync('npx prisma db seed', { cwd: path.resolve(__dirname, '..'), stdio: 'pipe' });
+    res.json({ success: true, message: 'Database seeded successfully' });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.stderr?.toString() || err.message });
+  }
+});
+
 // Serve frontend static build in production
 if (isProduction) {
   const frontendDist = path.resolve(__dirname, '../../frontend/dist');
