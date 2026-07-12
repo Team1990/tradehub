@@ -41,10 +41,18 @@ app.get('/api/health', (_req, res) => {
 app.post('/api/setup/seed', async (_req, res) => {
   try {
     const { execSync } = require('child_process');
-    execSync('npx prisma db seed', { cwd: path.resolve(__dirname, '..'), stdio: 'pipe' });
-    res.json({ success: true, message: 'Database seeded successfully' });
+    const backendDir = isProduction
+      ? path.resolve(__dirname, '..')
+      : path.resolve(__dirname, '..');
+    const result = execSync('npx prisma db seed', { cwd: backendDir, encoding: 'utf8', timeout: 120000 });
+    res.json({ success: true, message: 'Database seeded successfully', output: result });
   } catch (err: any) {
-    res.status(500).json({ success: false, message: err.stderr?.toString() || err.message });
+    res.status(500).json({
+      success: false,
+      message: err.stderr?.toString() || err.message,
+      stdout: err.stdout?.toString(),
+      stderr: err.stderr?.toString(),
+    });
   }
 });
 
