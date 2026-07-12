@@ -5,7 +5,7 @@ import { config } from '../config';
 export function errorHandler(err: Error, _req: Request, res: Response, _next: NextFunction) {
   if (err instanceof AppError) return sendError(res, err);
   console.error('Unhandled error:', err);
-  return sendError(res, new AppError(500, config.nodeEnv === 'production' ? `Internal server error: ${err.message}` : err.message));
+  return sendError(res, new AppError(500, config.nodeEnv === 'production' ? 'Internal server error' : err.message));
 }
 
 export function notFoundHandler(_req: Request, res: Response) {
